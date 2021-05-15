@@ -5,7 +5,7 @@ Used for code-gen of .bin (de)serialization classes: https://github.com/LoL-Fant
 Features
 - creates a cronjob that dumps every 10 minutes
 - exposes the meta directory on localhost:1337
-- modified to save to not only keep the latest meta file
+- modified to save more than one meta file
 
 Usage:
 ```sh
