@@ -42,6 +42,14 @@ def copy_file(src_filepath, dst_filepath):
     ensure_folder(dst_filepath)
     shutil.copyfile(src_filepath, dst_filepath)
 
+# Copy all files matching a pattern to a directory
+def copy_glob(src_pattern, dst_dir):
+    print(f"Copying glob {src_pattern} to {dst_dir}")
+    for src_filepath in glob.iglob(src_pattern):
+        source_basename = os.path.basename(src_filepath)
+        dst_filepath = f"{dst_dir}/{source_basename}"
+        copy_file(src_filepath, dst_filepath)
+
 # Prune folder
 def prune_folder(dirname):
     if os.path.exists(dirname):
@@ -63,17 +71,6 @@ def generate_script_file(dst_filepath, contents):
     with open(dst_filepath, "w") as dst_file:
         dst_file.write(INIT_SCRIPT)
     os.chmod(dst_filepath, 0o755)
-
-def read_txt_file_or_empty(src_filepath):
-    if not os.path.exists(src_filepath):
-        return ""
-    with open(src_filepath, 'r') as inf:
-        return inf.read().rstrip()
-
-def write_txt_file(dst_filepath, contents):
-    ensure_folder(dst_filepath)
-    with open(dst_filepath, "w") as dst_file:
-        dst_file.write(contents)
 
 # Download league files
 def download_files(downloader, manifest, dst_dir, namefilter):
@@ -120,33 +117,40 @@ def dump_meta(bindir, manifest, workdir, dst_dir):
     run_qemu(bindir, workdir)
     exitcode = int(open(f"{workdir}/share/lol/exitcode").read())
     assert(exitcode == 0)
+    copy_glob(f'{workdir}/share/lol/meta/meta_*.json', dst_dir)
 
-def fetch_latest_version(region):
+# .exe uses 4 point versioning, releases use 3
+def fixupversion(version):
+    major, minor, point = version.split('.')
+    # FIXME: this might not be correct
+    point_left = int(point[:3])
+    point_right = int(point[3:])
+    return f"{major}.{minor}.{point_left}.{point_right}"
+
+# Dump new version
+def dump_meta_releases(bindir, region, workdir, dst_dir):
     url = JSON_URL.format(region = region)
     print(f"Fetching releases from: {url}")
     request = urllib.request.Request(url, headers={'User-Agent':USER_AGENT})
     response = urllib.request.urlopen(request, timeout=15)
     data = response.read().decode('utf-8')
-    newversions = []
+    newversions = {}
     for release in json.loads(data)["releases"]:
         version, name = release["compat_version"]["id"].split('+')
+        version = fixupversion(version)
         manifest = release["download"]["url"]
-        print(f'Version manifest: {version} manifest')
-        newversions.append((version, manifest))
-    assert(len(newversions) == 1)
-    return newversions[0]
+        if not os.path.exists(f'{dst_dir}/meta_{version}.json'):
+            print(f"New version {version} @ {manifest}")
+            newversions[version] = manifest
+    if len(newversions):
+        # We might want to cancel with ctrl-C
+        for x in range(0, DELAY):
+            print(f"Waiting for {DELAY - x} seconds before downloading...")
+            time.sleep(1)
+        for version, manifest in newversions.items():
+            dump_meta('bin', manifest, 'tmp', 'meta')
 
-# Dump new version
-def dump_meta_latest(bindir, region, workdir, dst_dir):
-    version, manifest = fetch_latest_version(region)
-    last_dumped_version = read_txt_file_or_empty(f'{dst_dir}/version.txt')
-    print(f'Last dumped version is: {last_dumped_version}')
-    if version == last_dumped_version:
-        print(f'Up to date!')
-        return
-    dump_meta('bin', manifest, 'tmp', 'meta')
-    meta_json, = list(glob.iglob(f'{workdir}/share/lol/meta/meta_*.json'))
-    copy_file(meta_json, f'{dst_dir}/meta.json')
-    write_txt_file(f'{dst_dir}/version.txt', version)
-
-dump_meta_latest('bin', "EUW1", 'tmp', 'meta')
+if len(sys.argv) > 1:
+    dump_meta('bin', sys.argv[1], 'tmp', 'meta')
+else:
+    dump_meta_releases('bin', "EUW1", 'tmp', 'meta')

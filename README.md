@@ -1,15 +1,16 @@
-Dumping league metaclasses
+Dumping league metaclasses in a docker container
 
 Used for code-gen of .bin (de)serialization classes: https://github.com/LoL-Fantome/LeagueToolkit/tree/master/LeagueToolkit.Meta.Classes
 
+Features
+- creates a cronjob that dumps every 10 minutes
+- exposes the meta directory on localhost:1337
+
 Usage:
 ```sh
-# Clone the repo
-git clone https://github.com/LoL-Fantome/LeagueMetaJson
+# Clone the branch
+git clone https://github.com/LeagueRaINi/LeagueMetaJson.git --branch docker-alpine
 
-# The script expects to be in same directory(PR welcome)
-cd LeagueMetaJson
-
-# Dump any new version detected
-python3 dump_manifest.py
+# Build the docker image
+cd LeagueMetaJson && docker build .
 ```

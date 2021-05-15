@@ -1,0 +1,1 @@
+*/10 * * * * cd /usr/dumper && python3 dump_manifest.py >> /var/log/dumper.log
